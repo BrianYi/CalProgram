@@ -20,12 +20,16 @@
 #define MOD_RANGE_MAX   99
 #define MOD_RANGE       (MOD_RANGE_MAX - MOD_RANGE_MIN)
 
+#define TIME_LIMIT_SEC  30 * 60
+
 #define COL_NUM 5
 
 class QLabel;
 class QLineEdit;
 class QPushButton;
 class QFont;
+class QTimer;
+class QLCDNumber;
 class CalProgram : public QWidget
 {
     Q_OBJECT
@@ -43,6 +47,7 @@ public:
     public slots:
         void submit();
         void generateCalculations();
+        void timeTick();
 private:
     void resetAll();
     bool generateXY(int *a, int *b, int tp);
@@ -55,8 +60,13 @@ private:
     QPushButton         *closePushButton;
     QPushButton         *regenPushButton;
     QLabel              *gradeLabel;
+    QLabel              *timeLabel;
+    QLCDNumber          *timeLCD;
     QFont               *font;
+    QTimer              *timer;
     bool                isAlreadySubmit;
+    bool                isFirstTime;
+    int                 iLeftSecs;
 };
 
 #endif // CALPROGRAM_H

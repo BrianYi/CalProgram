@@ -7,7 +7,10 @@
 #include <QMessageBox>
 #include <QFont>
 #include <QFontMetrics>
-
+#include <QTimer>
+#include <QLCDNumber>
+#include <QTime>
+#include <QApplication>
 CalProgram::CalProgram(QWidget *parent)
     : QWidget(parent)
 {
@@ -21,8 +24,17 @@ CalProgram::CalProgram(QWidget *parent)
     closePushButton = new QPushButton(tr("关闭"),this);
     regenPushButton  = new QPushButton(tr("重新生成"),this);
     gradeLabel  = new QLabel(tr("<b>分数：0</b>"), this);
+    timeLabel = new QLabel(tr("<b>剩余时间：</b>"), this);
+    timeLCD = new QLCDNumber(5, this);
+    timeLCD->setMode(QLCDNumber::Dec);
+    timeLCD->setSegmentStyle(QLCDNumber::Flat);
+    timeLCD->setStyleSheet("border:none; color:red;");
+    timeLCD->display(QTime(0,30).toString("mm:ss"));
+    iLeftSecs = TIME_LIMIT_SEC;
     font    = new QFont("Times", 13);
+    timer = new QTimer(this);
     isAlreadySubmit = false;
+    isFirstTime = true;
     for (int i = 0; i < MUL_DEV_MOD_NUM; i++) {
         QHBoxLayout *hLayout    = new QHBoxLayout;
         expNumberList[i].setFont(*font);
@@ -40,18 +52,22 @@ CalProgram::CalProgram(QWidget *parent)
     hLayout->addStretch();
     hLayout->addWidget(gradeLabel);
     hLayout->addStretch();
+    hLayout->addWidget(timeLabel);
+    hLayout->addWidget(timeLCD);
+    hLayout->addStretch();
     hLayout->addWidget(submitPushButton);
     hLayout->addWidget(closePushButton);
     QVBoxLayout *vLayout = new QVBoxLayout;
     vLayout->addLayout(gridLayout);
     vLayout->addLayout(hLayout);
     setLayout(vLayout);
-    generateCalculations();
     setWindowTitle(tr("数学计算习题"));
     setWindowIcon(QIcon(":/Resources/app.ico"));
+    generateCalculations();
     connect(submitPushButton, SIGNAL(clicked()), this, SLOT(submit()));
     connect(regenPushButton, SIGNAL(clicked()), this, SLOT(generateCalculations()));
     connect(closePushButton, SIGNAL(clicked()), this, SLOT(close()));
+    connect(timer, SIGNAL(timeout()), this, SLOT(timeTick()));
 }
 
 CalProgram::~CalProgram()
@@ -60,6 +76,9 @@ CalProgram::~CalProgram()
     delete [] expLableList;
     delete [] valLineEditList;
     delete [] msgLabelList;
+    delete timeLabel;
+    delete timer;
+    delete timeLCD;
     delete submitPushButton;
     delete closePushButton;
     delete gradeLabel;
@@ -68,6 +87,18 @@ CalProgram::~CalProgram()
 
 void CalProgram::generateCalculations()
 {
+    if (QMessageBox::information(NULL, tr("准备答题"), tr("时间：30分钟，题目90道，你准备好了吗？"), QMessageBox::Yes | QMessageBox::No) == QMessageBox::No)
+    {
+        if (isFirstTime)
+        {
+            isFirstTime = false;
+        }
+        else 
+        {
+            return ;
+        }
+        
+    }
     resetAll();
     int iMulNumber = 0, iDevNumber = 0, iModNumber = 0, iNumber = 1;
     int iExpNumberWidth = expNumberList[0].fontMetrics().width(tr("(00)")),
@@ -132,6 +163,8 @@ void CalProgram::generateCalculations()
         expVal[iNumber-1]    = val;
         iNumber++;
     }
+    timer->start(1000);
+    iLeftSecs = TIME_LIMIT_SEC;
 }
 
 bool CalProgram::generateXY(int *a, int *b, int tp)
@@ -187,14 +220,14 @@ void CalProgram::submit()
             iNotCompleteNum++;
         }
     }
-    if (iNotCompleteNum) {
-        QMessageBox::information(0, tr("警告"), tr("您有<b>%1</b>道题目未做完!").arg(iNotCompleteNum));
-        return ;
-    }
+//     if (iNotCompleteNum) {
+//         QMessageBox::information(0, tr("警告"), tr("您有<b>%1</b>道题目未做完!").arg(iNotCompleteNum));
+//         return ;
+//     }
 
     int iCorrectNum = 0;
     for (int i = 0; i < MUL_DEV_MOD_NUM; i++) {
-        if (valLineEditList[i].text().toInt() != expVal[i]) {
+        if (valLineEditList[i].text().toInt() != expVal[i] || valLineEditList[i].text().isEmpty()) {
             msgLabelList[i].setStyleSheet("color:red;");
             msgLabelList[i].setText(tr("<b>X</b>"));
         }
@@ -208,6 +241,7 @@ void CalProgram::submit()
     if (!isAlreadySubmit)
         gradeLabel->setText(tr("<b>分数：%1</b>").arg(iCorrectNum));
     isAlreadySubmit = true;
+    timer->stop();
 }
 
 void CalProgram::resetAll()
@@ -221,6 +255,19 @@ void CalProgram::resetAll()
         gradeLabel->setText(tr("<b>分数：0</b>"));
     }
     isAlreadySubmit = false;
+}
+
+void CalProgram::timeTick()
+{
+    iLeftSecs--;
+    if (iLeftSecs < 0)
+    {
+        QMessageBox::warning(NULL, tr("时间到了"), tr("时间到了，系统自动提交当前所做题目"));
+        submit();
+        return ;
+    }
+    QTime t(0, iLeftSecs / 60, iLeftSecs % 60);
+    timeLCD->display(t.toString("mm:ss"));
 }
 
 
